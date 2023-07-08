@@ -6,12 +6,10 @@
 */
 
 import sysInfo from "systeminformation";
-import { EventEmitter } from "events";
-import fetch from "node-fetch";
 import os from "os";
 
-import { ClusterOptions, Options, Response } from "./typings";
-import { Cluster, ClusterManager } from "discord-hybrid-sharding";
+import { ClusterOptions, Response } from "bottracker.js";
+import { ClusterManager } from "discord-hybrid-sharding";
 import { serverCount, userCount } from "./Modules/cluster";
 
 function checkVar(name: string, variable: unknown, check: "exists" | "isString" | "isNumber") {
@@ -29,7 +27,7 @@ function checkVar(name: string, variable: unknown, check: "exists" | "isString" 
     return true;
 }
 
-export default class BotTracker extends EventEmitter {
+export default class ClusterClient {
     private options: ClusterOptions | null = null;
     private manager: ClusterManager | null = null;
 
@@ -38,11 +36,9 @@ export default class BotTracker extends EventEmitter {
     private bandwidth = 0;
     private commandsRun = 0;
     private popular: { name: string, count: number }[] = [];
-    private users: number[] = [];
+    private users: string[] = [];
 
     constructor(options: ClusterOptions) {
-        super();
-
         try {
             require("discord.js");
         } catch (err) {
@@ -76,7 +72,7 @@ export default class BotTracker extends EventEmitter {
         if (typeof options.stats?.postNetwork !== "boolean") throw new Error("\"postNetwork\" is not a boolean.");
 
         this.options = options;
-        this.manager = options.manager;
+        this.manager = options.manager as ClusterManager;
         this.manager?.on("clusterCreate", cluster => {
             let currentCluster = this.manager?.clusters.get(cluster.id);
             if ((cluster.id + 1) == this.manager?.totalClusters && autopost) {
@@ -91,7 +87,7 @@ export default class BotTracker extends EventEmitter {
             currentCluster?.on("message", async (rawMessage) => {
                 const message = rawMessage as { type: "bt_pc" | "bt_p", arg?: string, arg2?: string };
                 if (!message || typeof message !== "object") return;
-                if (message.type === "bt_pc") this.postCommand(message.arg as string, parseInt(message.arg2 as string));
+                if (message.type === "bt_pc") this.postCommand(message.arg as string, message.arg2 as string);
                 else if (message.type === "bt_p") this.post();
             })
         });
@@ -175,7 +171,7 @@ export default class BotTracker extends EventEmitter {
     /**
      * Post Stats For Command
      */
-    async postCommand(name: string, author: number) {
+    async postCommand(name: string, author: string) {
         if (this.sharding) throw new Error("Please use the bottracker sharding client if you want to use sharding.");
 
         checkVar("Command Name", name, "exists");

@@ -5,11 +5,10 @@
     https://github.com/ZeroTwoDiscord/statcord.js
 */
 
+import { Client, Guild } from "discord.js";
 import sysInfo from "systeminformation";
-import { EventEmitter } from "events";
-import fetch from "node-fetch";
 
-import { Options, Response } from "./typings";
+import { ClientOptions, Response } from "bottracker.js";
 
 function checkVar(name: string, variable: unknown, check: "exists" | "isString" | "isNumber") {
     if (check === "exists" && !variable) {
@@ -26,19 +25,18 @@ function checkVar(name: string, variable: unknown, check: "exists" | "isString" 
     return true;
 }
 
-export default class BotTracker extends EventEmitter {
-    private options: Options | null = null;
+export default class BotTrackerClient {
+    private client: Client;
+    private options: ClientOptions | null = null;
 
     // OTHER
     private sharding = false;
     private bandwidth = 0;
     private commandsRun = 0;
     private popular: { name: string, count: number }[] = [];
-    private users: number[] = [];
+    private users: string[] = [];
 
-    constructor(options: Options) {
-        super();
-
+    constructor(options: ClientOptions) {
         try {
             require("discord.js");
         } catch (err) {
@@ -61,23 +59,24 @@ export default class BotTracker extends EventEmitter {
         if (options.stats?.postNetwork === null || options.stats?.postNetwork === undefined) options.stats.postNetwork = true;
         if (typeof options.stats?.postNetwork !== "boolean") throw new Error("\"postNetwork\" is not a boolean.");
 
-        if (this.options?.client.shard) {
+        this.client = client;
+        this.options = options;
+
+        if (this?.client.shard) {
             this.sharding = true;
             throw new Error("Please use the bottracker sharding client if you want to use sharding.");
         } else this.sharding = false;
-
-        this.options = options;
     };
 
     /**
      * Manual post data
      * @returns {Promise<boolean | Error>} Returns true if worked, returns error if it didn't.
      */
-    async post() {
+    public async post() {
         if (this.sharding) throw new Error("Please use the bottracker sharding client if you want to use sharding.");
 
-        let servers = this.options?.client.guilds.cache.size;
-        let users = this.options?.client.guilds.cache.filter(guild => guild.available).reduce((prev, current) => prev + current.memberCount, 0);
+        let servers = this.client?.guilds.cache.size;
+        let users = this.client?.guilds.cache.filter((guild: Guild) => guild.available).reduce((prev: number, current: Guild) => prev + current.memberCount, 0);
 
         let memory = 0, memoryLoad = 0;
         if (this.options?.stats?.postMemory) {
@@ -115,7 +114,7 @@ export default class BotTracker extends EventEmitter {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                id: this.options?.client.user?.id as string,
+                id: this.client.user?.id as string,
                 key: this.options?.key,
                 active: this.users,
                 commands: this.commandsRun,
@@ -143,7 +142,7 @@ export default class BotTracker extends EventEmitter {
     /**
      * Post Stats For Command
      */
-    async postCommand(name: string, author: number) {
+    async postCommand(name: string, author: string) {
         if (this.sharding) throw new Error("Please use the bottracker sharding client if you want to use sharding.");
 
         checkVar("Command Name", name, "exists");
